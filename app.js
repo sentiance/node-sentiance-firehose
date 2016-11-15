@@ -1,3 +1,8 @@
+var rp = require('request-promise');
+var socketIOClient = require('socket.io-client');
+
+
+
 // Configuration
 var appId = process.argv[2] || '';
 var streamDefinitionId = process.argv[3] || '';
@@ -7,19 +12,22 @@ if(!appId || appId.length == 0 || !streamDefinitionId || streamDefinitionId.leng
     throw new Error('Bad configuration, please provide all values');
 }
 
+
+
+// Method to process data updates
 function processUpdate(message) {
     // Implement custom data handling here.
     // You can push the data to an internal queue, process it, ...
+
     // message.data         the graphql data projection
     // message.errors       any graphql errors (that might lead to ending your connection)
     // message.metadata     will hold the the processing_time, source trigger in a later phase
     console.log(message);
 }
 
-// App
 
-var rp = require('request-promise');
-var socketIOClient = require('socket.io-client');
+
+// Listener logic
 var firehoseSocketUrl = 'https://preprod-firehose.sentiance.com/';
 var apiUrl = 'https://preprod-api.sentiance.com/v2/gql';
 
@@ -30,13 +38,12 @@ function createSubscription() {
             authorization: 'Bearer '+bearerToken
         },
         body: {
-            query: `
-mutation($app_id:String!, $stream_definition_id: String!) {
-    createSubscription(app_id:$app_id, stream_definition_id: $stream_definition_id) {
-        id
-        token
-    }
-}`,
+            query: `mutation($app_id:String!, $stream_definition_id: String!) {
+                        createSubscription(app_id:$app_id, stream_definition_id: $stream_definition_id) {
+                            id
+                            token
+                        }
+                    }`,
             variables: {
                 app_id: appId,
                 stream_definition_id: streamDefinitionId
@@ -53,7 +60,7 @@ mutation($app_id:String!, $stream_definition_id: String!) {
 }
 
 function subscribe(socket, subscriptionId, subscriptionToken) {
-    console.log('subscribe: id: '+ subscriptionId+', token: '+subscriptionToken);
+    console.log('subscribing with id: '+ subscriptionId+', token: '+subscriptionToken);
     socket.emit('subscribe-v1', {
         id: subscriptionId,
         token: subscriptionToken
@@ -79,7 +86,7 @@ function initFirehoseConnection(subscriptionId, subscriptionToken) {
     socket = socketIOClient(firehoseSocketUrl);
 
     socket.on('connect', function () {
-        console.log('firehose connected, endpoint: ' + firehoseSocketUrl);
+        console.log('connected to: ' + firehoseSocketUrl);
         subscribe(socket, subscriptionId, subscriptionToken);
     });
 
@@ -109,5 +116,6 @@ function reconnect() {
 }
 
 
-// Start listening
+
+// Start socket client
 reconnect();
