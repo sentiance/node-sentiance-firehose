@@ -1,68 +1,113 @@
-var requestPromise = require('request-promise');
-var socketIOClient = require('socket.io-client');
+// Configuration
+var appId = process.argv[2] || '';
+var streamDefinitionId = process.argv[3] || '';
+var bearerToken = process.argv[4] || '';
 
-var streamDefinitionId = process.argv[2] || 'static_id_here'; 
-var bearerToken = process.argv[3] || 'static_token_here'; 
-
-var firehoseSubscriptionEndpoint = 'https://preprod-firehose.sentiance.com/'; 
-var appId = '00000000000000000000000a'; // Our journeys demo app
-
-
-// Create a subscription on a stream definition
-function createSubscription() {
-    return requestPromise({
-            method: 'POST',
-            uri: 'http://ec2-52-208-92-127.eu-west-1.compute.amazonaws.com:15012/firestation/'+appId+'/stream_definitions/'+streamDefinitionId+'/subscriptions',
-            body: {
-                bearer_token: bearerToken
-            },
-            json: true
-        })
-        .then(function(body) {
-            console.log('Subscription created', body);
-            return body;
-        });
+if(!appId || appId.length == 0 || !streamDefinitionId || streamDefinitionId.length == 0 || !bearerToken || bearerToken.length == 0) {
+    throw new Error('Bad configuration, please provide all values');
 }
 
+function processUpdate(message) {
+    // Implement custom data handling here.
+    // You can push the data to an internal queue, process it, ...
+    // message.data         the graphql data projection
+    // message.errors       any graphql errors (that might lead to ending your connection)
+    // message.metadata     will hold the the processing_time, source trigger in a later phase
+    console.log(message);
+}
 
-// Setup the websocket connection
+// App
+
+var rp = require('request-promise');
+var socketIOClient = require('socket.io-client');
+var firehoseSocketUrl = 'https://preprod-firehose.sentiance.com/';
+var apiUrl = 'https://preprod-api.sentiance.com/v2/gql';
+
+function createSubscription() {
+    return rp.post({
+        uri: apiUrl,
+        headers: {
+            authorization: 'Bearer '+bearerToken
+        },
+        body: {
+            query: `
+mutation($app_id:String!, $stream_definition_id: String!) {
+    createSubscription(app_id:$app_id, stream_definition_id: $stream_definition_id) {
+        id
+        token
+    }
+}`,
+            variables: {
+                app_id: appId,
+                stream_definition_id: streamDefinitionId
+            }
+        },
+        json: true
+    })
+    .then(function(body) {
+        if(body && body.data && body.data.createSubscription) {
+            return body.data.createSubscription;
+        }
+        throw new Error('createSubscription: Could not create subscription', { app_id: appId, stream_definition_id: streamDefinitionId, bearer_token: bearerToken });
+    });
+}
+
+function subscribe(socket, subscriptionId, subscriptionToken) {
+    console.log('subscribe: id: '+ subscriptionId+', token: '+subscriptionToken);
+    socket.emit('subscribe-v1', {
+        id: subscriptionId,
+        token: subscriptionToken
+    });
+}
+
 var socket;
+var reconnectTimeout;
+
+function scheduleReconnect(timeout) {
+    timeout = timeout || 1000;
+    if(reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+    }
+    reconnectTimeout = setTimeout(reconnect, timeout);
+}
+
 function initFirehoseConnection(subscriptionId, subscriptionToken) {
-    if(socket) {
+    if (socket) {
         socket.disconnect();
     }
-    socket = socketIOClient(firehoseSubscriptionEndpoint);
+    socket = socketIOClient(firehoseSocketUrl);
 
-    function subscribe() {
-        console.log('subscribe-v1 :: subscription id: '+ subscriptionId+', subscription token: '+subscriptionToken);
-        socket.emit('subscribe-v1', {
-            id: subscriptionId, 
-            token: subscriptionToken
-        });
-    }
-
-    socket.on('connect', function(){
-        console.log('firehose connected, endpoint: '+firehoseSubscriptionEndpoint);
-        subscribe();
+    socket.on('connect', function () {
+        console.log('firehose connected, endpoint: ' + firehoseSocketUrl);
+        subscribe(socket, subscriptionId, subscriptionToken);
     });
 
-    socket.on('data', function(jsonMessage){
+    socket.on('data', function (jsonMessage) {
         var message = JSON.parse(jsonMessage);
-        console.log(message.data); // Contains the graphql projection
+        processUpdate(message);
     });
 
-    socket.on('disconnect', function(){ console.log('disconnected') });
-    socket.on('error', function(e){ console.log('error', e) });
+    socket.on('disconnect', function () {
+        console.log('disconnected');
+        scheduleReconnect();
+    });
+    socket.on('error', function (e) {
+        console.log('error', e);
+    });
+}
+
+function reconnect() {
+    createSubscription()
+        .then(function(subscription) {
+            initFirehoseConnection(subscription.id, subscription.token);
+        })
+        .catch(function(err) {
+            console.error(err);
+            scheduleReconnect();
+        });
 }
 
 
-
-
-// Create a subscription and start processing firehose data messages that contain the GQL model
-createSubscription()
-    .then(function(subscription) {
-        initFirehoseConnection(subscription.id, subscription.token);
-    })
-    .catch(function(err) {
-        console.error(err);
-    })
+// Start listening
+reconnect();

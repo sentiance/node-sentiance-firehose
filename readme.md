@@ -7,5 +7,5 @@ npm install
 
 Running:
 ```
-node app.js STREAM_DEFINITION_ID BEARER_TOKEN
+node app.js APP_ID STREAM_DEFINITION_ID BEARER_TOKEN
 ```
