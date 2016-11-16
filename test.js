@@ -1,16 +1,13 @@
-# Sentiance Firehose
-Node.js module for connecting to the sentiance firehose
+var firehose = require('./index');
 
-## Connecting
-Connection requires an application id and stream definition ID.  
+// Configuration
+var applicationId        = process.argv[2] || '';
+var streamDefinitionId  = process.argv[3] || '';
+var bearerToken         = process.argv[4] || '';
 
-The application ID is the ID you are using in your mobile app configuration.
-The bearer token is either the SDK user/device token or an application backend token that can be obtained using the app manager.
-
-```
-var firehose = require('sentiance-firehose');
-
-firehose.connect(applicationId, streamDefinitionId, bearerToken);
+if(!applicationId || applicationId.length == 0 || !streamDefinitionId || streamDefinitionId.length == 0 || !bearerToken || bearerToken.length == 0) {
+    throw new Error('Bad configuration, please provide all values');
+}
 
 /**
  * Called on every data update the stream emits
@@ -30,17 +27,4 @@ function onDataUpdate(data, errors, metadata) {
 
 firehose.onData(onDataUpdate);
 // firehose.enableDebug(); // Show log messages
-```
-
-## Testing
-Tested with node 4.6.1
-
-Install:
-```
-npm install
-```
-
-Testing:
-```
-node test.js APP_ID STREAM_DEFINITION_ID BEARER_TOKEN
-```
+firehose.connect(applicationId, streamDefinitionId, bearerToken);
