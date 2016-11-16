@@ -1,6 +1,11 @@
 # Sentiance Firehose
 Node.js module for connecting to the sentiance firehose
 
+## Adding to project
+```
+npm install https://github.com/sentiance/node-sentiance-firehose --save
+```
+
 ## Connecting
 Connection requires an application id and stream definition ID.  
 

@@ -1,8 +1,9 @@
 {
   "name": "sentiance-firehose",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "dependencies": {
+    "request": "^2.78.0",
     "request-promise": "^4.1.1",
     "socket.io": "^1.5.0",
     "socket.io-client": "^1.5.0"
