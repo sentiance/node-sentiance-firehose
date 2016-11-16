@@ -1,5 +1,5 @@
 # Sentiance Firehose
-Node.js module for connecting to the sentiance firehose
+Node.js module for connecting to the Sentiance Firehose.
 
 ## Adding to project
 ```
