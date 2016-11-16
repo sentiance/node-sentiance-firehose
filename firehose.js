@@ -6,8 +6,8 @@ var config = {
     appId: null,
     streamDefinitionId: null,
     bearerToken: null,
-    firehoseSocketUrl: 'https://preprod-firehose.sentiance.com/',
-    apiUrl: 'https://preprod-api.sentiance.com/v2/gql',
+    firehoseSocketUrl: 'https://firehose.sentiance.com/',
+    apiUrl: 'https://api.sentiance.com/v2/gql',
     delay: 1000,
     debug: false
 };
