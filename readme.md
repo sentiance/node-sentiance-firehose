@@ -9,7 +9,8 @@ npm install https://github.com/sentiance/node-sentiance-firehose --save
 ## Subscribing for messages
 Connection requires a valid application ID, stream definition ID and a bearer token that has access to the data the stream is providing.  
 
-The application ID is the ID you are using in your mobile app configuration.
+The application ID is the ID you are using in your mobile app configuration.  
+
 The bearer token is either the SDK user/device token or an application backend token that can be obtained using the app manager.
 
 ```
