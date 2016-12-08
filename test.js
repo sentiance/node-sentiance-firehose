@@ -21,7 +21,7 @@ firehose.connect(applicationId, streamDefinitionId, bearerToken);
 function onDataUpdate(data, errors, metadata) {
     // Implement custom data handling here.
     // Push the data to an internal queue, filter & process it in realtime, ...
-    console.log(JSON.stringify(data, null, 2));
+    console.log(JSON.stringify(data));
     if(errors) {
         console.error(errors);
     }
