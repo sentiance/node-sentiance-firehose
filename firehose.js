@@ -2,16 +2,16 @@ var rp = require('request-promise');
 var socketIOClient = require('socket.io-client');
 
 var config = {
+    debug: false,
     onDataUpdate: null,
     appId: null,
     streamDefinitionId: null,
     bearerToken: null,
     firehoseSocketUrl: 'https://firehose.sentiance.com/',
     apiUrl: 'https://api.sentiance.com/v2/gql',
-    delay: 1000,
-    debug: false
+    reconnect: true,
+    reconnectDelay: 1000
 };
-
 
 function d() {
     if(config.debug) {
@@ -49,10 +49,14 @@ function createSubscription() {
 
 function subscribe(socket, subscriptionId, subscriptionToken) {
     d('Firehose: subscribing with id: '+ subscriptionId+', token: '+subscriptionToken);
-    socket.emit('subscribe-v1', {
+    var subscription = {
         id: subscriptionId,
         token: subscriptionToken
-    });
+    };
+    if(config._skipHeartbeat) {
+        subscription._skipHeartbeat = true;
+    }
+    socket.emit('subscribe-v1', subscription);
 }
 
 function processUpdate(message) {
@@ -65,12 +69,14 @@ var socket;
 var reconnectTimeout;
 
 function scheduleReconnect(timeout) {
-    timeout = timeout || config.delay;
+    timeout = timeout || config.reconnectDelay;
     if(reconnectTimeout) {
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;
     }
-    reconnectTimeout = setTimeout(reconnect, timeout);
+    if(config.reconnect) {
+        reconnectTimeout = setTimeout(reconnect, timeout);
+    }
 }
 
 function initFirehoseConnection(subscriptionId, subscriptionToken) {
@@ -108,7 +114,23 @@ function reconnect() {
     }
     createSubscription()
         .then(function(subscription) {
-            initFirehoseConnection(subscription.id, subscription.token);
+            d('subscription: '+JSON.stringify(subscription));
+            if(!config.__connectionSetupDelay) {
+                return subscription;
+            }
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    resolve(subscription);
+                }, config.__connectionSetupDelay);
+            });
+        })
+        .then(function(subscription) {
+            if(config._subscriptionToken) {
+                initFirehoseConnection(subscription.id, config._subscriptionToken);
+            } else {
+                initFirehoseConnection(subscription.id, subscription.token);
+            }
+
         })
         .catch(function(err) {
             console.error(err);
@@ -118,10 +140,16 @@ function reconnect() {
 
 
 
-function connect(appId, streamDefinitionId, bearerToken) {
+function connect(appId, streamDefinitionId, bearerToken, options) {
     config.appId = appId;
     config.streamDefinitionId = streamDefinitionId;
     config.bearerToken = bearerToken;
+    for(var k in options) {
+        config[k] = options[k];
+    }
+    if(config.debug) {
+        d('config: '+JSON.stringify(config));
+    }
     setTimeout(reconnect);
 }
 module.exports.connect = connect;

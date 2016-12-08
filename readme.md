@@ -15,8 +15,6 @@ The bearer token is either the SDK user/device token or an application backend t
 ```
 var firehose = require('sentiance-firehose');
 
-firehose.connect(applicationId, streamDefinitionId, bearerToken);
-
 /**
  * Called on every data update the stream emits
  *
@@ -35,6 +33,8 @@ function onDataUpdate(data, errors, metadata) {
 
 firehose.onData(onDataUpdate);
 // firehose.enableDebug(); // Show log messages
+
+firehose.connect(applicationId, streamDefinitionId, bearerToken);
 ```
 
 ## Testing
