@@ -1,4 +1,4 @@
-var firehose = require('./index');
+var firehose = require('./../index');
 
 // Configuration
 var applicationId        = process.argv[2] || '';
