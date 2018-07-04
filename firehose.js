@@ -11,16 +11,18 @@ const globalConfig = {
 function enableDebug() {
     globalConfig.debug = true;
 }
+
 module.exports.enableDebug = enableDebug;
 
 function disableDebug() {
     globalConfig.debug = false;
 }
+
 module.exports.disableDebug = disableDebug;
 
 
 function d() {
-    if(globalConfig.debug) {
+    if (globalConfig.debug) {
         console.log.apply(console.log, arguments);
     }
 }
@@ -53,11 +55,16 @@ class FirehoseClient extends EventEmitter {
         this.config.appId = appId;
         this.config.streamDefinitionId = streamDefinitionId;
         this.config.bearerToken = bearerToken;
-        for(let k in options) {
+        for (let k in options) {
             this.config[k] = options[k];
         }
-        if(globalConfig.debug) {
-            d('config: '+JSON.stringify(this.config));
+        if (globalConfig.debug) {
+            d('config: ' + JSON.stringify(this.config));
+        }
+
+        if (options.userIds && Array.isArray(options.userIds) && options.userIds.length) {
+            d(`Subscribing with userIds: ${options.userIds}`)
+            this._userIds = options.userIds
         }
     }
 
@@ -69,37 +76,38 @@ class FirehoseClient extends EventEmitter {
         return rp.post({
             uri: this.config.apiUrl,
             headers: {
-                authorization: 'Bearer '+this.config.bearerToken
+                authorization: 'Bearer ' + this.config.bearerToken
             },
             body: {
-                query: 'mutation($app_id:String!, $stream_definition_id: String!) {\
-                        createSubscription(app_id:$app_id, stream_definition_id: $stream_definition_id) {\
+                query: 'mutation($app_id:String!, $stream_definition_id: String!, $user_ids: [String]) {\
+                        createSubscription(app_id:$app_id, stream_definition_id: $stream_definition_id, user_ids: $user_ids) {\
                             id\
                             token\
                         }\
                     }',
                 variables: {
                     app_id: this.config.appId,
-                    stream_definition_id: this.config.streamDefinitionId
+                    stream_definition_id: this.config.streamDefinitionId,
+                    user_ids: this._userIds || null
                 }
             },
             json: true
         })
-        .then(body => {
-            if(body && body.data && body.data.createSubscription) {
-                return body.data.createSubscription;
-            }
-            throw new Error('createSubscription: Could not create subscription', this.config);
-        });
+            .then(body => {
+                if (body && body.data && body.data.createSubscription) {
+                    return body.data.createSubscription;
+                }
+                throw new Error('createSubscription: Could not create subscription', this.config);
+            });
     }
 
     subscribe(socket, subscriptionId, subscriptionToken) {
-        d('Firehose: subscribing with id: '+ subscriptionId+', token: '+subscriptionToken);
+        d('Firehose: subscribing with id: ' + subscriptionId + ', token: ' + subscriptionToken);
         let subscription = {
             id: subscriptionId,
             token: subscriptionToken
         };
-        if(this.config._skipHeartbeat) {
+        if (this.config._skipHeartbeat) {
             subscription._skipHeartbeat = true;
         }
         socket.emit('subscribe-v1', subscription);
@@ -111,11 +119,11 @@ class FirehoseClient extends EventEmitter {
 
     scheduleReconnect(timeout) {
         timeout = timeout || this.config.reconnectDelay;
-        if(this._reconnectTimeout) {
+        if (this._reconnectTimeout) {
             clearTimeout(this._reconnectTimeout);
             this._reconnectTimeout = null;
         }
-        if(this.config.reconnect) {
+        if (this.config.reconnect) {
             this._reconnectTimeout = setTimeout(() => this.reconnect(), timeout);
         }
     }
@@ -135,7 +143,7 @@ class FirehoseClient extends EventEmitter {
             try {
                 var message = JSON.parse(jsonMessage);
                 this.processUpdate(message);
-            } catch(e) {
+            } catch (e) {
                 console.error('Firehose: could not process data message', e);
             }
         });
@@ -153,8 +161,8 @@ class FirehoseClient extends EventEmitter {
     reconnect() {
         this.createSubscription()
             .then(subscription => {
-                d('subscription: '+JSON.stringify(subscription));
-                if(!this.config.__connectionSetupDelay) {
+                d('subscription: ' + JSON.stringify(subscription));
+                if (!this.config.__connectionSetupDelay) {
                     return subscription;
                 }
                 return new Promise((resolve, reject) => {
@@ -164,7 +172,7 @@ class FirehoseClient extends EventEmitter {
                 });
             })
             .then(subscription => {
-                if(this.config._subscriptionToken) {
+                if (this.config._subscriptionToken) {
                     this.initFirehoseConnection(subscription.id, this.config._subscriptionToken);
                 } else {
                     this.initFirehoseConnection(subscription.id, subscription.token);
@@ -177,24 +185,29 @@ class FirehoseClient extends EventEmitter {
             });
     }
 }
+
 module.exports.FirehoseClient = FirehoseClient;
 
 
 // GLOBAL
 let _onDataHandler;
+
 function globalOnData(handler) {
     _onDataHandler = handler;
 }
+
 module.exports.onData = globalOnData;
 
 let _instance;
+
 function globalConnect(appId, streamDefinitionId, bearerToken, options) {
-    if(_instance) throw new Error('Global instance already initialized');
-    if(!_onDataHandler) {
+    if (_instance) throw new Error('Global instance already initialized');
+    if (!_onDataHandler) {
         throw new Error('No data handler provided');
     }
     _instance = new FirehoseClient(appId, streamDefinitionId, bearerToken, options);
     _instance.on('data', _onDataHandler);
     _instance.connect();
 }
+
 module.exports.connect = globalConnect;
